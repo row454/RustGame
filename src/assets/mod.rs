@@ -2,18 +2,16 @@ use std::borrow::Borrow;
 use std::collections::HashMap;
 use std::hash::Hash;
 use std::rc::Rc;
-use sdl2::image::{LoadSurface, LoadTexture};
+use const_format::concatcp;
+use sdl2::image::LoadTexture;
 use sdl2::render::{Texture, TextureCreator};
-use sdl2::surface::Surface;
-use sdl2::video::WindowContext;
 
 use self::texture_atlas::TextureAtlas;
 mod texture_atlas;
 pub mod texture_region;
 
-const SPRITE_SIZE: u8 = 16;
-pub const ITEMS: usize = 1;
-pub const TILES: usize = 2;
+const ASSETS_LOCATION: &str = "assets/";
+const TEXTURE_LOCATION: &str = concatcp!(ASSETS_LOCATION, "textures/");
 
 
 pub struct ResourceManager<'asset, K, R, L>
@@ -61,11 +59,13 @@ impl<'asset, T> ResourceLoader<'asset, Texture<'asset>> for TextureCreator<T> {
     }
 }
 
-impl<'asset, T> ResourceLoader<'asset, TextureAtlas<Texture<'asset>>> for TextureCreator<T> {
+impl<'asset, T> ResourceLoader<'asset, TextureAtlas<'asset>> for TextureCreator<T> {
 	type Args = str;
 
-	fn load(&'asset self, data: &Self::Args) -> Result<TextureAtlas<Texture>, String> {
-		
+	fn load(&'asset self, data: &Self::Args) -> Result<TextureAtlas, String> {
+		let image = self.load_texture(String::from("sheet_") + data + ".png")?;
+
+		TextureAtlas::load(image, data.to_string() + ".json")
 	}
 
 	
