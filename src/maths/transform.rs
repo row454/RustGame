@@ -1,8 +1,6 @@
 use std::ops::{Div, Mul};
-use sdl2::render::{Canvas, RenderTarget, Texture};
-use crate::assets::texture_region::TextureRegion;
+
 use crate::maths::vector::Vector;
-use crate::render::camera::Camera;
 
 #[derive(Debug, Clone, Copy)]
 pub struct Transform {

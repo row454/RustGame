@@ -1,7 +1,5 @@
 use sdl2::render::WindowCanvas;
-use crate::assets;
-use crate::assets::{Assets};
-use crate::assets::texture_region::TextureRegion;
+use crate::assets::{self, TextureManager};
 use crate::maths::transform::Transform;
 use crate::maths::vector::Vector;
 use crate::render::CanvasExt;
@@ -17,7 +15,7 @@ pub struct Tiles<'asset> {
 }
 
 impl Tiles<'_> {
-    pub fn init<'asset>(assets: &'asset Assets<'asset>) -> Tiles<'asset> {
+    pub fn init<'asset>(texture_manager: TextureManager<>) -> Tiles<'asset> {
         let mut tiles = Tiles { tiles: Vec::new() };
         tiles.tiles.push(Box::new(BasicTile::new(assets.crop_sheet(assets::TILES, 1, 0, 1, 1).unwrap(), false)));
         tiles.tiles.push(Box::new(BasicTile::new(assets.crop_sheet(assets::TILES, 0, 0, 1, 1).unwrap(), true)));
@@ -26,11 +24,11 @@ impl Tiles<'_> {
     }
 }
 
-struct BasicTile<'asset> {
+struct BasicTile {
     texture: TextureRegion<'asset>,
     solid: bool,
 }
-impl BasicTile<'_> {
+impl BasicTile {
     const fn new(texture: TextureRegion, solid: bool) -> BasicTile {
         BasicTile {
             texture,

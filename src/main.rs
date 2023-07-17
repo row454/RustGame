@@ -4,17 +4,14 @@ use sdl2::keyboard::Keycode;
 use std::time::{Duration, Instant};
 use sdl2::rect::Rect;
 use sdl2::render::WindowCanvas;
-use crate::map::tile::Tiles;
+// use crate::map::tile::Tiles;
 use crate::maths::transform::Transform;
 use crate::maths::vector;
 use crate::maths::vector::Vector;
-use crate::render::camera::Camera;
-use crate::render::CanvasExt;
 
 mod assets;
 mod maths;
-mod render;
-mod map;
+// mod map;
 
 
 const FPS: u32 = 60;
@@ -48,9 +45,10 @@ fn main() -> Result<(), String> {
     let texture_creator = canvas.texture_creator();
 
 
-    let assets = assets::Assets::init(&texture_creator)?;
 
-    let test_sprite = assets.crop_sheet(assets::ENTITIES, 1, 0, 1, 1)?;
+
+    let mut texture_manager = assets::TextureManager::new(&texture_creator);
+    let test_sprite = texture_manager.load( "assets/textures/sheet_tiles.png")?;
     let mut ticks = 0;
     let mut event_pump = sdl_context.event_pump()?;
     let mut last_time = Instant::now();
@@ -58,9 +56,8 @@ fn main() -> Result<(), String> {
     let mut delta = 0.0;
     let mut timer = 0;
 
-    let mut camera = Camera::new(Transform::default().pos(Vector::new(30.0, 30.0, 0.0)), (320, 180), &texture_creator)?;
-    let tiles = Tiles::init(&assets);
-    let map = map::Map::new("assets/rooms/room.rm", &tiles)?;
+    // let tiles = Tiles::init(&texture_manager);
+    // let map = map::Map::new("assets/rooms/room.rm", &tiles)?;
     'running: loop {
 
 
@@ -106,18 +103,15 @@ fn main() -> Result<(), String> {
             tick();
             ticks += 1;
             delta -= 1.0;
-            let camera_offset = camera.transform;
-            canvas.with_texture_canvas(&mut camera.target, |canvas| {
+            // let camera_offset = camera.transform;
                 // Render
                 canvas.set_draw_color(sdl2::pixels::Color::RGB(100, 100, 100));
                 canvas.clear();
-                canvas.copy_transform(&test_sprite, &Transform::default(), &camera_offset).ok();
-                map.render(canvas, &camera_offset).ok();
+				canvas.copy(&test_sprite, None, None)?;
+                // map.render(canvas, &camera_offset).ok();
                 canvas.present();
                 // render(&mut canvas);
-            } ).map_err(|e| e.to_string())?;
-            camera.render(&mut canvas)?;
-            canvas.present();
+
         }
         if timer >= 1_000_000_000 {
             println!("Ticks and Frames: {}", ticks);

@@ -1,32 +1,73 @@
+use std::borrow::Borrow;
+use std::collections::HashMap;
+use std::hash::Hash;
+use std::rc::Rc;
 use sdl2::image::{LoadSurface, LoadTexture};
-use sdl2::render::TextureCreator;
+use sdl2::render::{Texture, TextureCreator};
 use sdl2::surface::Surface;
 use sdl2::video::WindowContext;
-use crate::assets::texture_region::TextureRegion;
-use crate::assets::texture_atlas::TextureAtlas;
+
+use self::texture_atlas::TextureAtlas;
 mod texture_atlas;
 pub mod texture_region;
+
 const SPRITE_SIZE: u8 = 16;
-pub const ENTITIES: usize = 0;
 pub const ITEMS: usize = 1;
 pub const TILES: usize = 2;
 
 
-pub struct Assets<'asset> {
-    sprite_sheets: Vec<TextureAtlas<'asset>>,
-}
-impl Assets<'_> {
-    pub fn init(texture_creator: &TextureCreator<WindowContext>) -> Result<Assets, String> {
-        Ok(Assets {
-            sprite_sheets: vec! [
-                TextureAtlas::new(texture_creator.load_texture("assets/textures/sheet_entities.png")?, SPRITE_SIZE, SPRITE_SIZE).map_err(|e| e.to_string())?,
-                TextureAtlas::new(texture_creator.load_texture("assets/textures/sheet_items.png")?, SPRITE_SIZE, SPRITE_SIZE).map_err(|e| e.to_string())?,
-                TextureAtlas::new(texture_creator.load_texture("assets/textures/sheet_tiles.png")?, SPRITE_SIZE, SPRITE_SIZE).map_err(|e| e.to_string())?,
-        ] })
-
-    }
-    pub fn crop_sheet(&self, sheet: usize, vrow: u8, hrow: u8, width: u8, height: u8) -> Result<TextureRegion, String> {
-        self.sprite_sheets.get(sheet).ok_or("Out of bounds sheet used, please use the sheet constants")?.crop(vrow, hrow, width, height).map_err(|e| e.to_string())
-    }
+pub struct ResourceManager<'asset, K, R, L>
+    where K: Hash + Eq,
+          L: ResourceLoader<'asset, R> {
+        loader: &'asset L,
+        cache: HashMap<K, Rc<R>>,
 }
 
+impl<'asset, K, R, L> ResourceManager<'asset, K, R, L>
+    where K: Hash + Eq,
+          L: ResourceLoader<'asset, R> {
+    pub fn new(loader: &'asset L) -> Self {
+        ResourceManager {
+            loader,
+            cache: HashMap::new(),
+        }
+    }
+
+    pub fn load<D>(&mut self, details: &D) -> Result<Rc<R>, String> 
+	where
+	    L: ResourceLoader<'asset, R, Args = D>,
+		D: Eq + Hash + ?Sized,
+		K: Borrow<D> + for<'a> From<&'a D>,{
+        if let Some(resource) = self.cache.get(details).cloned() {
+            return Ok(resource);
+        }
+        let resource = Rc::new(self.loader.load(details)?);
+        self.cache.insert(details.into(), resource.clone());
+        Ok(resource)
+    }
+}
+pub type TextureManager<'asset, T> = ResourceManager<'asset, String, Texture<'asset>, TextureCreator<T>>;
+
+pub trait ResourceLoader<'asset, R> {
+    type Args: ?Sized;
+    fn load(&'asset self, data: &Self::Args) -> Result<R, String>;
+}
+
+impl<'asset, T> ResourceLoader<'asset, Texture<'asset>> for TextureCreator<T> {
+    type Args = str;
+
+    fn load(&'asset self, data: &Self::Args) -> Result<Texture, String> {
+        self.load_texture(data)
+    }
+}
+
+impl<'asset, T> ResourceLoader<'asset, TextureAtlas<Texture<'asset>>> for TextureCreator<T> {
+	type Args = str;
+
+	fn load(&'asset self, data: &Self::Args) -> Result<TextureAtlas<Texture>, String> {
+		
+	}
+
+	
+
+}
