@@ -18,15 +18,9 @@ impl Default for Transform {
     }
 }
 
-
-
 impl Transform {
     pub(crate) fn new(pos: Vector, rot: f32, scale: Vector) -> Transform {
-        Transform {
-            pos,
-            rot,
-            scale,
-        }
+        Transform { pos, rot, scale }
     }
     pub fn pos(mut self, pos: Vector) -> Transform {
         self.pos = pos;

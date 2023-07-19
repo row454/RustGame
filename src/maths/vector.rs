@@ -125,5 +125,4 @@ impl Vector {
             z: self.z.abs(),
         }
     }
-
 }

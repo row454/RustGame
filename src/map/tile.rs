@@ -10,12 +10,12 @@ pub trait Tile {
     fn render(&self, canvas: &mut WindowCanvas, camera_offset: &Transform, x: u32, y: u32) -> Result<(), String>;
 }
 
-pub struct Tiles<'asset> {
-    pub tiles: Vec<Box<dyn Tile + 'asset>>,
+pub struct Tiles {
+    pub tiles: Vec<Box<dyn Tile>>,
 }
 
-impl Tiles<'_> {
-    pub fn init<'asset>(texture_manager: TextureManager<>) -> Tiles<'asset> {
+impl Tiles {
+    pub fn init(texture_manager: TextureManager) -> Tiles {
         let mut tiles = Tiles { tiles: Vec::new() };
         tiles.tiles.push(Box::new(BasicTile::new(assets.crop_sheet(assets::TILES, 1, 0, 1, 1).unwrap(), false)));
         tiles.tiles.push(Box::new(BasicTile::new(assets.crop_sheet(assets::TILES, 0, 0, 1, 1).unwrap(), true)));
