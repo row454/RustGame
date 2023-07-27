@@ -4,3 +4,9 @@ struct Storage<T> {
 }
 
 type ArchWorld<T> = HashMap<String, Storage<T>>;
+
+
+
+pub struct World {
+	archetypes: HashMap<String, HashSet<ArchetypeId>>
+}
