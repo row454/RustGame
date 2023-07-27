@@ -7,7 +7,7 @@ use std::hash::Hash;
 use std::rc::Rc;
 
 use self::texture_atlas::TextureAtlas;
-mod texture_atlas;
+pub mod texture_atlas;
 pub mod texture_region;
 
 const ASSETS_LOCATION: &str = "assets/";
@@ -48,8 +48,10 @@ where
         Ok(resource)
     }
 }
-pub type TextureManager<'asset, T> =
-    ResourceManager<'asset, String, Texture, TextureCreator<T>>;
+pub type TextureManager<'asset, T> = ResourceManager<'asset, String, Texture, TextureCreator<T>>;
+
+pub type TextureAtlasManager<'asset, T> =
+    ResourceManager<'asset, String, TextureAtlas, TextureCreator<T>>;
 
 pub trait ResourceLoader<'asset, R> {
     type Args: ?Sized;
@@ -68,8 +70,8 @@ impl<T> ResourceLoader<'_, TextureAtlas> for TextureCreator<T> {
     type Args = str;
 
     fn load(&'_ self, data: &Self::Args) -> Result<TextureAtlas, String> {
-        let image = self.load_texture(String::from("sheet_") + data + ".png")?;
+        let image = self.load_texture(TEXTURE_LOCATION.to_owned() + "sheet_" + data + ".png")?;
 
-        TextureAtlas::load(image, data.to_string() + ".json")
+        TextureAtlas::load(image, TEXTURE_LOCATION.to_owned() + data + ".json")
     }
 }

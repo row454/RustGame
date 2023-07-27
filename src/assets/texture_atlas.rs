@@ -5,13 +5,13 @@ use super::texture_region::TextureRegion;
 use serde::Deserialize;
 pub struct TextureAtlas {
     image: Rc<Texture>,
-    regions: HashMap<String, Region>,
+    regions: HashMap<String, Rc<Region>>,
 }
 
 impl TextureAtlas {
     pub fn new(image: Rc<Texture>) -> Self {
         TextureAtlas {
-            image: image,
+            image,
             regions: HashMap::new(),
         }
     }
@@ -23,11 +23,16 @@ impl TextureAtlas {
         .map_err(|e| e.to_string())?;
 
         for (name, region) in raw_regions {
-            atlas.regions.insert(name, region.set_image(atlas.image.clone(), 0, 0));
+            atlas
+                .regions
+                .insert(name, Rc::new(region.set_image(atlas.image.clone(), 0, 0)));
         }
 
         println!("{:?}", atlas.regions);
         Ok(atlas)
+    }
+    pub fn get_region(&self, details: &str) -> Option<Rc<Region>> {
+        self.regions.get(details).cloned()
     }
 }
 #[derive(Deserialize)]
@@ -44,9 +49,10 @@ impl RawRegion {
                 src.y += y_offset;
 
                 TextureRegion {
-                texture: texture,
-                src: src.into(),
-            }}),
+                    texture,
+                    src: src.into(),
+                }
+            }),
             Self::Animation(mut src, raw_frames) => {
                 src.x += x_offset;
                 src.y += y_offset;
@@ -60,16 +66,18 @@ impl RawRegion {
             Self::Atlas(mut src, raw_atlas) => {
                 src.x += x_offset;
                 src.y += y_offset;
-				let mut atlas = HashMap::new();
+                let mut atlas = HashMap::new();
                 for (name, region) in raw_atlas {
-                    atlas.insert(name, region.set_image(texture.clone(), x_offset + src.x, y_offset + src.y));
+                    atlas.insert(
+                        name,
+                        region.set_image(texture.clone(), x_offset + src.x, y_offset + src.y),
+                    );
                 }
 
                 Region::Atlas(atlas)
-			}
+            }
         }
     }
-	
 }
 #[derive(Deserialize)]
 struct Rect {
@@ -78,59 +86,59 @@ struct Rect {
     width: u32,
     height: u32,
 }
-impl Into<sdl2::rect::Rect> for Rect {
-    fn into(self) -> sdl2::rect::Rect {
-        sdl2::rect::Rect::new(self.x as i32, self.y as i32, self.width, self.height)
+impl From<Rect> for sdl2::rect::Rect {
+    fn from(val: Rect) -> Self {
+        sdl2::rect::Rect::new(val.x as i32, val.y as i32, val.width, val.height)
     }
 }
 
-#[derive(Debug)]
-enum Region {
+#[derive(Debug, Clone)]
+pub enum Region {
     Single(TextureRegion),
     Animation(Vec<Region>),
     Atlas(HashMap<String, Region>),
 }
 impl Region {
-	fn expect_single(self, reason: &'static str) -> TextureRegion {
-		if let Self::Single(region) = self {
-			return region;
-		} else {
-			panic!("{reason}: {self:?}");
-		}
-	}
-	fn expect_animation(self, reason: &'static str) -> Vec<Region> {
-		if let Self::Animation(frames) = self {
-			return frames;
-		} else {
-			panic!("{reason}: {self:?}");
-		}
-	}
-	fn expect_atlas(self, reason: &'static str) -> HashMap<String, Region> {
-		if let Self::Atlas(atlas) = self {
-			return atlas;
-		} else {
-			panic!("{reason}: {self:?}");
-		}
-	}
-    fn unwrap_single(self) -> TextureRegion {
-		if let Self::Single(region) = self {
-			return region;
-		} else {
-			panic!("unwrap_single failed, was given: {self:?}");
-		}
-	}
-	fn unwrap_animation(self) -> Vec<Region> {
-		if let Self::Animation(frames) = self {
-			return frames;
-		} else {
-			panic!("unwrap_animation failed, was given: {self:?}");
-		}
-	}
-	fn unwrap_atlas(self) -> HashMap<String, Region> {
-		if let Self::Atlas(atlas) = self {
-			return atlas;
-		} else {
-			panic!("unwrap_atlas failed, was given: {self:?}");
-		}
-	}
+    pub fn expect_single(&self, reason: &'static str) -> TextureRegion {
+        if let Self::Single(region) = self {
+            region.to_owned()
+        } else {
+            panic!("{reason}: {self:?}");
+        }
+    }
+    pub fn expect_animation(&self, reason: &'static str) -> Vec<Region> {
+        if let Self::Animation(frames) = self {
+            frames.to_owned()
+        } else {
+            panic!("{reason}: {self:?}");
+        }
+    }
+    pub fn expect_atlas(&self, reason: &'static str) -> HashMap<String, Region> {
+        if let Self::Atlas(atlas) = self {
+            atlas.to_owned()
+        } else {
+            panic!("{reason}: {self:?}");
+        }
+    }
+    pub fn unwrap_single(&self) -> TextureRegion {
+        if let Self::Single(region) = self {
+            region.to_owned()
+        } else {
+            panic!("unwrap_single failed, was given: {self:?}");
+        }
+    }
+    pub fn unwrap_animation(&self) -> Vec<Region> {
+        if let Self::Animation(frames) = self {
+            frames.to_owned()
+        } else {
+            panic!("unwrap_animation failed, was given: {self:?}");
+        }
+    }
+    pub fn unwrap_atlas(&self) -> HashMap<String, Region> {
+        if let Self::Atlas(atlas) = self {
+            atlas.to_owned()
+        } else {
+            panic!("unwrap_atlas failed, was given: {self:?}");
+        }
+    }
 }

@@ -1,3 +1,4 @@
+use map::tile::Tiles;
 use sdl2::event::Event;
 use sdl2::keyboard::Keycode;
 use sdl2::rect::Rect;
@@ -10,9 +11,9 @@ use crate::maths::vector;
 use crate::maths::vector::Vector;
 
 mod assets;
-mod maths;
 mod entities;
-// mod map;
+mod map;
+mod maths;
 
 const FPS: u32 = 60;
 
@@ -46,8 +47,13 @@ fn main() -> Result<(), String> {
 
     let texture_creator = canvas.texture_creator();
 
-    let mut texture_manager = assets::TextureManager::new(&texture_creator);
-    let test_sprite = texture_manager.load("assets/textures/sheet_tiles.png")?;
+    // let mut texture_manager = assets::TextureManager::new(&texture_creator);
+    let mut texture_atlas_manager = assets::TextureAtlasManager::new(&texture_creator);
+    let test_atlas = texture_atlas_manager
+        .load("tiles")
+        .expect("texture should exist");
+    let test_region = test_atlas.get_region("floor").unwrap();
+    let test_sprite = test_region.unwrap_single();
     let mut ticks = 0;
     let mut event_pump = sdl_context.event_pump()?;
     let mut last_time = Instant::now();
@@ -55,8 +61,8 @@ fn main() -> Result<(), String> {
     let mut delta = 0.0;
     let mut timer = 0;
 
-    // let tiles = Tiles::init(&texture_manager);
-    // let map = map::Map::new("assets/rooms/room.rm", &tiles)?;
+    let tiles = Tiles::init(&texture_atlas_manager.load("tiles").unwrap());
+    let map = map::Map::new("assets/rooms/room.rm", &tiles)?;
     'running: loop {
         let now = Instant::now();
         delta += (now - last_time).as_nanos() as f32 / time_per_tick.as_nanos() as f32;
@@ -125,8 +131,7 @@ fn main() -> Result<(), String> {
             // Render
             canvas.set_draw_color(sdl2::pixels::Color::RGB(100, 100, 100));
             canvas.clear();
-            canvas.copy(&test_sprite, None, None)?;
-            // map.render(canvas, &camera_offset).ok();
+            map.render(&mut canvas).ok();
             canvas.present();
             // render(&mut canvas);
         }
