@@ -1,7 +1,7 @@
 use core::arch;
 use std::{collections::{HashMap, hash_map::DefaultHasher}, sync::Arc, hash::{Hash, Hasher}, f32::consts::E, any::{Any, type_name}};
 
-use self::components::{Storage, Component};
+use self::components::{Storage, Component, storage_cast_mut};
 
 mod archetype;
 mod components;
@@ -14,6 +14,7 @@ struct World {
 	entities: HashMap<EntityId, Pointer>,
 	archetypes: HashMap<u64, ArchetypeStorage>
 }
+#[derive(Clone)]
 struct Pointer {
 	archetype_id: u64,
 	row_index: usize
@@ -51,11 +52,12 @@ impl World {
 		new_id
 	}
 
-	fn archetype_from_entity(&mut self, id: EntityId) -> Option<&mut ArchetypeStorage>{
-		self.entities.get(&id).map(|ptr| self.archetypes.get_mut(&ptr.archetype_id))?
+	fn archetype_id_from_entity(&self, id: EntityId) -> Option<&Pointer> {
+		self.entities.get(&id)
 	}
-	pub fn set_component<T: Component>(&mut self, id: EntityId, name: &str, value: T) -> Result<(), String> {
-		let mut archetype = self.archetype_from_entity(id).ok_or("entity does not exist")?;
+	pub fn set_component<T: Component>(&mut self, id: EntityId, name: &str, component: T) -> Result<Option<T>, String> {
+		let archetype_id = &self.archetype_id_from_entity(id).ok_or("entity does not exist")?.archetype_id;
+		let archetype = self.archetypes.get(archetype_id).ok_or("entity has no archetype")?;
 		let old_hash = archetype.hash;
 		let has_already = archetype.components.contains_key(name);
 		let new_hash = {
@@ -67,37 +69,57 @@ impl World {
 				old_hash ^ hasher.finish()
 			}
 		};
-		let mut current_archetype_storage = self.archetypes.entry(new_hash).or_insert({
-			let mut new_archetype = ArchetypeStorage { 
-				hash: new_hash, 
-				components: HashMap::new(), 
-				entity_ids: Vec::new()
-			};
-			let mut column_iter = archetype.components.iter();
-			for entry in column_iter {
-				new_archetype.components.insert(entry.0.to_owned(), entry.1.clone_type());
-			}
-			let new_component_storage = T::ComponentStorage::init();
-			new_archetype
-		});
-		
+		let mut current_archetype_storage;
 		if has_already {
 			let ptr = self.entities.get(&id).ok_or("entity does not exist")?;
-			current_archetype_storage.set(ptr.row_index, name, value)
-
-		} else {
-			let new_row = current_archetype_storage.new_row(id);
-			let old_ptr = self.entities.get(id);
-			let mut column_iter = archetype.components.iter();
+			current_archetype_storage = self.archetypes.get_mut(&new_hash).unwrap();
+			current_archetype_storage.set(ptr.row_index, name, component)
+		} else if self.archetypes.contains_key(&new_hash) {
+			let new_row = self.archetypes.get_mut(&new_hash).unwrap().new_row(id);
+			let old_ptr = self.entities.get(&id).ok_or("entity does not exist")?.clone();
+			let column_iter = archetype.components.iter();
 			for entry in column_iter {
 				let old_component_storage = entry.1;
-				let mut new_component_storage = current_archetype_storage.components.get_mut(entry.0);
-				new_component_storage.
+				let mut new_component_storage = self.archetypes.get_mut(&new_hash).unwrap().components.get_mut(entry.0).expect("New component storage was initialized incorrectly");
+				let old_component_storage = storage_cast_mut::<T::ComponentStorage>(old_component_storage.as_mut()).unwrap();
+				old_component_storage.move_to::<T::ComponentStorage, T>(
+					old_ptr.row_index,
+					storage_cast_mut::<T::ComponentStorage>(new_component_storage.as_mut()).unwrap(),
+					new_row);
 			}
+			current_archetype_storage = self.archetypes.get_mut(&new_hash).unwrap();
+			current_archetype_storage.entity_ids[new_row] = id;
+			current_archetype_storage.set(new_row, name, component)
+		} else {
+			let mut new_row;
+			current_archetype_storage = {
+				let mut new_archetype = ArchetypeStorage { 
+					hash: new_hash, 
+					components: HashMap::new(), 
+					entity_ids: Vec::new()
+				};
+				new_row = new_archetype.new_row(id);
+				let old_ptr = self.entities.get(&id).ok_or("entity does not exist")?.clone();
+				let column_iter = archetype.components.iter();
+				for entry in column_iter {
+					new_archetype.components.insert(entry.0.to_owned(), entry.1.clone_type());
+					let old_component_storage = entry.1;
+					let mut new_component_storage = new_archetype.components.get_mut(entry.0).expect("New component storage was initialized incorrectly");
+					let old_component_storage = storage_cast_mut::<T::ComponentStorage>(old_component_storage.as_mut()).unwrap();
+					old_component_storage.move_to::<T::ComponentStorage, T>(
+						old_ptr.row_index,
+						storage_cast_mut::<T::ComponentStorage>(new_component_storage.as_mut()).unwrap(),
+						new_row);
+				}
+				let new_component_storage = T::ComponentStorage::init();
+				self.archetypes.insert(new_hash, new_archetype);
+				self.archetypes.get_mut(&new_hash).unwrap()
+				};
+			
+			current_archetype_storage.set(new_row, name, component)
 		}
 	}
 }
-
 struct ArchetypeStorage {
 	hash: u64,
 	components: HashMap<String, Box<dyn Storage>>,
@@ -116,7 +138,7 @@ impl ArchetypeStorage {
 			storage.remove(row_index)
 		}
 	}
-	pub fn set<T: Component>(&mut self, row_index: usize, name: &str, component: T) -> Result<(), String> {
+	pub fn set<T: Component>(&mut self, row_index: usize, name: &str, component: T) -> Result<Option<T>, String> {
 		let mut component_storage_erased = self.components.get_mut(name).ok_or(String::from("Invalid component name given: ")+ name)?;
 		let mut component_storage: &mut T::ComponentStorage = component_storage_erased.as_any().downcast_mut().ok_or(format!("{name} is not of type {}", type_name::<T>()))?;
 		component_storage.set(row_index, component)
