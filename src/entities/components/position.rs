@@ -1,1 +1,1 @@
-pub type Position = (f32, f32);
+pub struct Position(pub f32, pub f32);

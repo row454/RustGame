@@ -1,3 +1,5 @@
+use entities::World;
+use entities::components::position::Position;
 use map::tile::Tiles;
 use sdl2::event::Event;
 use sdl2::keyboard::Keycode;
@@ -63,6 +65,10 @@ fn main() -> Result<(), String> {
 
     let tiles = Tiles::init(&texture_atlas_manager.load("tiles").unwrap());
     let map = map::Map::new("assets/rooms/room.rm", &tiles)?;
+
+    let mut world = World::init();
+    let entity = world.new_entity();
+    world.set_component(entity, Position(1.0, 4.0))?;
     'running: loop {
         let now = Instant::now();
         delta += (now - last_time).as_nanos() as f32 / time_per_tick.as_nanos() as f32;
